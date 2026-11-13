@@ -1,0 +1,20 @@
+# Separate environment for RNA velocity (10_velocity.ipynb) only.
+# scvelo 0.3.x fails with pandas 3 / numpy 2.5 used in the main `single-cell` env (pd.unique on lists,
+# "setting an array element with a sequence" in velocity / velocity_graph), checked 2026-11-13.
+name: velocity
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - scvelo=0.3
+  - scanpy
+  - anndata
+  - pandas<2.3
+  - numpy<2
+  - numba
+  - matplotlib
+  - seaborn
+  - statsmodels
+  - pyyaml
+  - ipykernel

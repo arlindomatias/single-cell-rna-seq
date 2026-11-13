@@ -1,0 +1,235 @@
+# Parameters for the single_cell_notebook analysis (GSE216146).
+# Every notebook reads this file through scripts/sc_utils.load_config().
+# Relative paths are resolved from the folder that contains this file;
+# environment variables such as ${DATA} are expanded.
+
+paths:
+  data_dir: ${DATA}                                # raw GEO files (read-only)
+  # Analysis input: GEO counts files (inside data_dir). The author h5ad
+  # (GSE216146_chemo_brain.h5ad.gz) is not used.
+  counts_mtx: GSE216146_expression_matrix.mtx.gz   # cells x genes, integer UMI counts
+  genes_tsv: GSE216146_genes.tsv.gz                # row order = mtx columns
+  cell_metadata_tsv: GSE216146_cell_metadata.tsv.gz  # row order = mtx rows
+  author_h5ad_gz: GSE216146_chemo_brain.h5ad.gz   # authors' object: only its spliced/unspliced layers, for 09/10
+  results_dir: results                             # git-ignored
+  plots_dir: results/plots
+  tables_dir: results/tables
+  figures_dir: figures                             # tracked copies of key plots
+
+# Samples and conditions
+samples:
+  # biosample: expected pathology code (checked in 01_qc)
+  D20-6407: PN
+  D21-2746: PN
+  D21-2747: PN
+  D20-6409: CN
+  D21-2750: CN
+  D21-2751: CN
+condition_labels:                                  # pathology code -> condition
+  PN: Control
+  CN: Chemotherapy
+reference_condition: Control
+
+# 01_qc: thresholds from the original exploratory script, except the mitochondrial
+# filter, which is per sample (median + mt_nmads * MAD) because the D20 batch has
+# higher mt fractions (decided 2026-11-13; a fixed 20 % cut removed ~1/3 of D20 cells).
+qc:
+  metadata_columns:                                # author columns kept in obs (QC is recomputed)
+    [biosample, pathology, batch, doublet_score, predicted_doublet, MajorCellType, orig_celltype]
+  mt_prefix: "mt-"                                 # mouse genes are lower case (mt-Co1, ...)
+  ribo_prefixes: ["Rps", "Rpl"]
+  hb_regex: "^Hb[ab]-"
+  min_genes: 100                                   # per cell
+  max_genes_quantile: 0.98                         # per sample, upper cut on n_genes_by_counts
+  mt_nmads: 3                                      # per sample: remove pct_counts_mt > median + 3 MAD
+  max_pct_mt: null                                 # optional fixed ceiling on top of the MAD cut (null = off)
+  max_pct_ribo: 20
+  min_cells: 3                                     # per gene, after merging samples
+  doublet_column: predicted_doublet                # author-provided Scrublet call
+  target_sum: 10000
+
+# 02_integration_clustering
+integration:
+  n_top_genes: 2000
+  hvg_batch_key: biosample
+  n_pcs: 50
+  harmony_key: biosample
+  n_neighbors: 15
+  leiden_resolutions: [0.15, 0.5, 2.0]          # same as the original script
+  random_state: 0
+
+# 03_annotation
+annotation:
+  # Mouse_Whole_Brain (adult whole brain, Allen atlas subclasses) chosen by the user on 2026-11-13 instead of the
+  # original Mouse_Postnatal_DentateGyrus (P12-35 dentate gyrus only).
+  celltypist_model: Mouse_Whole_Brain.pkl
+  majority_voting: true
+  over_clustering: leiden_res_2.00                 # from 02; used only for CellTypist majority voting
+  cluster_key: leiden_res_0.50                     # final labels are assigned per cluster at this resolution
+  # Allen subclass label -> broad class (first matching regex wins)
+  celltypist_classes:
+    - ["IMN$", Neuroblast]
+    - ["(Astroependymal|Tanycyte|Hypendymal|Ependymal)", Ependymal]
+    - ["(Astro|Bergmann)", Astrocyte]
+    - ["CHOR", Choroid plexus]
+    - ["OPC", OPC]
+    - ["Oligo", Oligodendrocyte]
+    - ["OEC", OEC]
+    - ["(ABC|VLMC)", Fibroblast]
+    - ["(Peri|SMC)", Mural]
+    - ["Endo", Endothelial]
+    - ["Microglia", Microglia]
+    - ["BAM", BAM]
+    - ["(Monocytes|DC)", Monocyte/DC]
+    - ["Lymphoid", Lymphocyte]
+    - ["(Glut|Gaba|Chol|Dopa|Sero)", Neuron]
+  # Final labels per cluster_key cluster (decided 2026-11-13 from CellTypist, markers and author labels).
+  # `celltypist`: expected majority CellTypist class of the cluster; 03 asserts it, so cluster drift is caught.
+  cluster_labels:
+    "0":  {cell_type: Astrocyte,           fine: Astrocyte,                      celltypist: Astrocyte}
+    "1":  {cell_type: Oligodendrocyte,     fine: Oligodendrocyte 1,              celltypist: Oligodendrocyte}
+    "2":  {cell_type: Oligodendrocyte,     fine: Oligodendrocyte 2,              celltypist: Oligodendrocyte}
+    "3":  {cell_type: Microglia,           fine: Microglia (IEG-high),           celltypist: Microglia}
+    "4":  {cell_type: Microglia,           fine: Microglia (homeostatic),        celltypist: Microglia}
+    "5":  {cell_type: Low-quality microglia, fine: Low-quality microglia,        celltypist: Microglia}
+    "6":  {cell_type: Endothelial,         fine: Endothelial,                    celltypist: Endothelial}
+    "7":  {cell_type: OPC,                 fine: OPC,                            celltypist: OPC}
+    "8":  {cell_type: Neuron,              fine: DG granule neuron,              celltypist: Neuron}
+    "9":  {cell_type: Choroid plexus,      fine: Choroid plexus epithelium,      celltypist: Choroid plexus}
+    "10": {cell_type: Neuroblast,          fine: DG neuroblast (immature neuron), celltypist: Neuroblast}
+    "11": {cell_type: Neuron,              fine: Cajal-Retzius cell,             celltypist: Neuron}
+    "12": {cell_type: Mural/Fibroblast,    fine: Pericyte/fibroblast,            celltypist: Mural}
+    "13": {cell_type: Oligodendrocyte,     fine: Newly formed oligodendrocyte,   celltypist: Oligodendrocyte}
+    "14": {cell_type: BAM,                 fine: Border-associated macrophage,   celltypist: BAM}
+    "15": {cell_type: Ependymal,           fine: Ependymal,                      celltypist: Ependymal}
+  marker_genes:
+    Astrocyte: [Slc1a3, Aqp4, Gja1, Aldoc]
+    Oligodendrocyte: [Mog, Plp1, Mbp]
+    OPC: [Pdgfra, Cspg4]
+    Microglia: [Cx3cr1, P2ry12, Tmem119]
+    BAM: [Mrc1, Lyz2]
+    Neuron: [Snap25, Rbfox3, Prox1]
+    Neuroblast: [Dcx, Sox11, Calb2]
+    Cajal-Retzius: [Reln, Lhx1]
+    Endothelial: [Pecam1, Cldn5, Flt1]
+    Mural/Fibroblast: [Pdgfrb, Kcnj8, Col1a2, Dcn]
+    Choroid plexus: [Kcnj13, Clic6, Ttr]
+    Ependymal: [Foxj1, Rarres2]
+  ambient_genes: [Ttr, Hbb-bs, Hba-a1]             # checked for ambient contamination (not removed)
+
+# Downstream analyses (04 onwards)
+downstream:
+  exclude_cell_types: [Low-quality microglia]      # user decision 2026-11-13 (cluster 5, see CLAUDE.md)
+
+# 04_composition: propeller-style test (arcsin-sqrt proportions, OLS per cell type, BH FDR)
+composition:
+  formula: "~ batch + condition"
+  sensitivity_drop: [Choroid plexus]               # also test after removing these types and renormalizing
+  fdr: 0.1
+
+# 05_pseudobulk_de: sum counts per biosample x cell_type, PyDESeq2 per cell type
+pseudobulk:
+  sample_key: biosample
+  group_key: cell_type
+  design: "~ batch + condition"
+  contrast: [condition, Chemotherapy, Control]     # factor, tested level, reference level
+  min_cells_per_sample: 10                         # a sample enters a cell type's pseudobulk only above this
+  min_samples_per_group: 2                         # per condition, else the cell type is skipped
+  min_gene_counts: 10                              # keep genes with >= this many counts ...
+  min_gene_samples: 3                              # ... in at least this many samples
+  padj: 0.05
+  lfc: 0.5
+  n_label: 12                                      # genes labelled per volcano plot
+  n_cpus: 4
+  # Flags only (genes are kept): ambient RNA and dissociation-stress genes (see CLAUDE.md, 03_annotation)
+  ambient_source: Choroid plexus                   # genes >= ambient_fold higher there than in the tested type
+  ambient_fold: 10
+  other_type_fold: 20                              # flag genes >= 20x higher in another cell type (doublets/ambient)
+  stress_genes: [Fos, Fosb, Jun, Junb, Jund, Egr1, Egr2, Egr3, Ier2, Ier3, Ier5, Atf3, Dusp1, Zfp36, Nr4a1,
+                 Klf2, Klf4, Klf6, Btg2, Hspa1a, Hspa1b, Hspa8, Hsph1, Dnajb1, Socs3, Nfkbia, Cebpd, Gadd45b]
+  technical_genes: [Gm42418, AY036118, Lars2, Malat1]  # rRNA (Rn45s) overlap / library-prep artefacts
+
+# 06_enrichment: gseapy prerank per cell type on the 05 DE statistic
+enrichment:
+  libraries: [GO_Biological_Process_2025, KEGG_2019_Mouse, MSigDB_Hallmark_2020]   # Enrichr, cached in results/gene_sets/
+  custom_gmt: [resources/SAUL_SEN_MAYO.mouse.gmt]  # SenMayo (Saul et al. 2022)
+  organism: Mouse
+  rank_by: stat                                    # DESeq2 Wald statistic
+  exclude_flagged: true                            # drop genes flagged in 05 (ambient, other_type, stress, technical)
+  min_size: 10
+  max_size: 500
+  permutations: 1000
+  fdr: 0.05
+  seed: 0
+  n_top_terms: 8                                   # per cell type in the overview dotplot
+
+# 07_senescence: per-cell senescence scores, tested per sample
+senescence:
+  senmayo_gmt: resources/SAUL_SEN_MAYO.mouse.gmt
+  senepy_species: Mouse                            # SenePy hubs from Tabula Muris Senis (cell_type signatures, v2)
+  # Matched SenePy signatures (merged, genes in >= matched_overlap signatures); other types get only the universal one
+  matched:
+    Microglia: "^microglial cell$"                 # Brain microglia (the only brain signature)
+    Endothelial: "endothelial|endocardial"
+    BAM: "macrophage|Kupffer"
+    Mural/Fibroblast: "^(?:fibroblast|smooth muscle cell)$"
+  matched_overlap: 2                               # ignored when only one signature matches
+  exclude_gene_regex: "^(Hb[ab]-|mt-)"             # hemoglobins (blood/ambient) and mt genes removed from all signatures
+  min_cells_per_sample: 10
+  formula: "~ batch + condition"
+  high_quantile: 0.95                              # "high-score" cells: above this quantile of control cells, per cell type
+  fdr: 0.1
+
+# 08_cell_communication: LIANA+ (user decision 2026-11-13: Python LIANA+, not R CellChat)
+communication:
+  resource: mouseconsensus
+  methods: [cellphonedb, connectome, logfc, natmi, singlecellsignalr, cellchat]   # consensus incl. CellChat
+  expr_prop: 0.1                                   # ligand/receptor expressed in >= 10 % of the cells of a type
+  min_cells: 10
+  n_perms: 1000
+  seed: 0
+  n_jobs: 4
+  specificity_rank: 0.05                           # consensus threshold for a "significant" interaction
+  cellchat_pval: 0.05
+  formula: "~ batch + condition"
+  min_samples_test: 6                              # pair-count test only where the pair exists in all samples
+  exclude_gene_regex: "^(Rp[sl]|mt-)"             # ribosomal / mt genes are not real ligands or receptors
+  de_padj: 0.05                                    # concordant: same sign, one partner padj < de_padj, other p < de_pval
+  de_pval: 0.05
+  n_top: 25
+
+# 09_pseudotime (main env) and 10_velocity (env `velocity`)
+pseudotime:
+  # OPC are disconnected from oligodendrocytes in the kNN graph (PAGA connectivity ~0, Enpp6 in 1 % of OPC: no
+  # committed OPC captured), so the trajectory is newly formed -> mature oligodendrocyte (checked 2026-11-13).
+  context: [OPC, Newly formed oligodendrocyte, Oligodendrocyte 1, Oligodendrocyte 2]  # shown in the PAGA check
+  lineage: [Newly formed oligodendrocyte, Oligodendrocyte 1, Oligodendrocyte 2]      # cell_type_fine, trajectory
+  root_type: Newly formed oligodendrocyte
+  root_markers: [Enpp6]                            # root = cell of root_type with the highest summed z-score
+  use_rep: X_pca_harmony                           # global Harmony PCs (lineage-only PCA scrambled the order)
+  n_neighbors: 15
+  n_dcs: 10
+  markers: [Pdgfra, Gpr17, Enpp6, Tcf7l2, Fyn, Mog, Mbp, Plp1, Opalin, Il33, Grm3, Klk6, Apod, S100b]
+  n_bins: 10                                       # pseudotime bins for the gene trend plots
+  n_dynamic_genes: 40
+  formula: "~ batch + condition"
+  min_cells_per_sample: 20
+  velocity_input: 09_lineage_velocity_input.h5ad   # in results/, read by 10_velocity
+
+# 10_velocity (kernel `velocity`, env envs/velocity.yaml)
+velocity:
+  min_shared_counts: 20
+  n_top_genes: 2000
+  n_neighbors: 30
+  mode: stochastic                                 # dynamical model reversed the direction (checked 2026-11-13)
+  check_dynamical: true                            # also run the dynamical model and report it as a check
+  n_jobs: 4
+  formula: "~ batch + condition"
+
+# Figures copied (downscaled) from results/plots/ to the tracked figures/ folder by scripts/export_figures.py
+readme_figures:
+  max_width: 1800
+  files: [01_qc_violin_after, 03_umap_cell_type, 03_dotplot_markers_by_cell_type, 04_proportions_by_condition,
+          05_volcano_overview, 06_senmayo_nes, 06_hallmark_heatmap, 07_frac_high_per_sample,
+          08_de_interactions_top, 09_umap_pseudotime, 10_velocity_stream]
+

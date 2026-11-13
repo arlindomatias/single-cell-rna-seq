@@ -1,6 +1,6 @@
-# Driver + interactive environment for the whole repository.
-# Run Snakemake from here (`snakemake --use-conda`); rules build their own envs from
-# <project>/envs/*.yaml. The analysis stack is included for interactive/notebook work.
+# Main environment for the whole repository: the analysis stack used by the Jupyter notebooks
+# (kernel `single-cell`). Projects add separate envs in <project>/envs/ only when a tool needs
+# incompatible versions (single_cell_notebook/envs/velocity.yaml for scVelo).
 name: single-cell
 channels:
   - conda-forge
@@ -12,15 +12,23 @@ dependencies:
   - scanpy
   - anndata
   - harmonypy
+  - umap-learn<0.6   # 0.6.0 rejects the non-contiguous kNN arrays scanpy 1.12 passes (TypingError in neighbors)
   - python-igraph
   - leidenalg
   - celltypist
   - pydeseq2
   - decoupler-py
   - gseapy
+  - pyyaml   # config.yaml
   - pandas
   - numpy
   - scipy
+  - statsmodels   # composition test (04)
   - matplotlib
   - seaborn
   - ipykernel
+  - setuptools<81   # senepy imports pkg_resources (removed in setuptools 81)
+  - pip
+  - pip:
+      - senepy==1.0.1   # senescence hubs (07_senescence)
+      - liana==2.1.1    # cell-cell communication (08_cell_communication)

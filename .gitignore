@@ -42,6 +42,7 @@ celltypist_models/
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/
+.virtual_documents/   # jupyterlab-lsp cache
 .venv/
 
 # ---- R session files --------------------------------------
