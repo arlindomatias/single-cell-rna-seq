@@ -1,4 +1,4 @@
-# Analysis environment used by every Snakemake rule of single_cell_cisp
+# Analysis environment used by every Snakemake rule of single_cell_notebook
 # (QC, Harmony integration, clustering, CellTypist annotation, pseudobulk DE, enrichment).
 channels:
   - conda-forge
