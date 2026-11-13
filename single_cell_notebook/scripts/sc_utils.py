@@ -113,13 +113,17 @@ def add_qc_metrics(adata: ad.AnnData, qc: dict) -> None:
 
 
 def filter_cells(adata: ad.AnnData, qc: dict) -> tuple[ad.AnnData, dict]:
-    """Apply per-cell QC filters to one sample. Returns the filtered copy and the cells removed per step."""
+    """Apply per-cell QC filters to one sample. Returns the filtered copy and the cells removed per step.
+    Also writes `adata.obs["qc_fail"]` in place: the first filter that removed each cell ("" = kept)."""
     removed = {}
     keep = np.ones(adata.n_obs, dtype=bool)
+    fail = np.full(adata.n_obs, "", dtype=object)
 
     def step(name, mask):
         nonlocal keep
-        removed[name] = int((keep & ~mask).sum())
+        newly = keep & ~mask
+        removed[name] = int(newly.sum())
+        fail[newly] = name
         keep &= mask
 
     step("min_genes", adata.obs["n_genes_by_counts"].to_numpy() >= qc["min_genes"])
@@ -134,6 +138,7 @@ def filter_cells(adata: ad.AnnData, qc: dict) -> tuple[ad.AnnData, dict]:
     step("doublet", ~adata.obs[qc["doublet_column"]].astype(bool).to_numpy())
     removed["max_genes_cutoff"] = round(float(upper), 1)
     removed["mt_cutoff"] = round(float(mt_cut), 2)
+    adata.obs["qc_fail"] = pd.Categorical(fail)
     return adata[keep].copy(), removed
 
 
@@ -223,10 +228,14 @@ def ols_by_column(values: pd.DataFrame, meta: pd.DataFrame, formula: str = "~ ba
 
     ref, alt = list(meta[term].cat.categories)[:2]
     coef_name = f"{term}[T.{alt}]"
+    covars = [c for c in meta.columns if re.search(rf"\b{re.escape(c)}\b", formula)]
+    meta = meta[covars]
     rows = []
     for col in values.columns:
         df = meta.join(values[col].rename("y"), how="inner").dropna(subset=["y"])
-        ok = df[term].nunique() == 2 and len(df) > df.drop(columns="y").nunique().clip(upper=2).sum()
+        # need both groups and >= 2 residual degrees of freedom (parameters: intercept + 1 per binary covariate)
+        n_params = 1 + sum(min(df[c].nunique() - 1, 1) for c in covars)
+        ok = df[term].nunique() == 2 and len(df) >= n_params + 2
         fit = smf.ols(f"y {formula}", data=df).fit() if ok else None
         rows.append({"feature": col,
                      f"mean_{ref}": df.loc[df[term] == ref, "y"].mean(),

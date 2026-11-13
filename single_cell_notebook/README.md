@@ -10,7 +10,7 @@ pseudotime and RNA velocity of oligodendrocyte maturation.
 The analysis is a set of numbered Jupyter notebooks that run top to bottom. All parameters are in
 [`config.yaml`](config.yaml), and shared functions are in [`scripts/sc_utils.py`](scripts/sc_utils.py).
 
-> **Scope.** Each condition has three mice, and the two sequencing batches differ in quality. Every test uses the
+> **Scope.** Each condition has three samples, and the two sequencing batches differ in quality. Every test uses the
 > sample, not the cell, as the replicate and includes the batch as a covariate. With 3 vs 3, the results are
 > **exploratory**: few of them pass multiple-testing correction, and the text below reports nominal p-values when
 > FDR is not reached.
@@ -62,7 +62,17 @@ to `results/plots/`, and a selection is copied to [`figures/`](figures) by
 
 The D20 batch is of lower quality, with a higher mitochondrial fraction and many low-complexity cells. A fixed 20 %
 mitochondrial cut would have removed about a third of its cells, so the cut is set per sample at median + 3 MAD.
-After QC, 9,832 cells and 20,009 genes remain.
+After QC, 9,832 cells and 19,941 genes remain.
+
+> **QC bias, read before interpreting neurons and microglia.** The QC thresholds were kept as they are, but notebook
+> 01 measures what they remove for each cell type, using the authors' labels for the removed cells:
+> - **Neurons:** the per-sample mitochondrial cut removes 46 % of neurons in controls and 62 % after cisplatin,
+>   because neurons have more mitochondrial reads than glia. Before QC, neuron proportions barely differ between
+>   conditions, so neuron composition and neuron DE should not be interpreted.
+> - **Neuroblasts:** the decrease after cisplatin is already present before QC, so it is not caused by filtering.
+> - **Microglia:** the ribosomal filter removes 9.4 % of microglia after cisplatin vs 3.5 % in controls. The removed
+>   cells are not more activated, but the filter trims the high-ribosomal cells, so ribosome/translation changes in
+>   microglia are probably under-estimated.
 
 ![QC after filtering](figures/01_qc_violin_after.png)
 
@@ -80,9 +90,13 @@ ambient RNA, so these genes are flagged in the differential expression rather th
 ### Composition
 
 No cell type passes FDR < 0.1. **Neuroblasts** are lower in all three cisplatin samples than in every control
-(log2 ratio -1.7 to -1.9, p = 0.03). This fits reduced hippocampal neurogenesis, although dissection may contribute.
-An apparent decrease of microglia is an artefact of the large choroid plexus fraction in one sample: it disappears
-once choroid plexus is removed and the proportions are renormalized.
+(log2 ratio -1.7 to -1.9, p = 0.03). The difference is already present before QC (authors' labels: 0.2–0.6 % vs
+1.4–1.8 % of cells), so it is not a filtering artefact. It fits reduced hippocampal neurogenesis, although
+dissection may contribute. Two other apparent changes are artefacts:
+- **Microglia** seem to decrease only because one sample has a large choroid plexus fraction; the difference
+  disappears once choroid plexus is removed and the proportions are renormalized.
+- **Mature neurons** seem to decrease mainly because of QC. The mitochondrial cut removes many neurons (46 % in
+  controls, 62 % with cisplatin), and before QC their proportions barely differ between conditions.
 
 ![Composition per sample](figures/04_proportions_by_condition.png)
 
@@ -149,6 +163,9 @@ RNA velocity (scVelo stochastic model) gives an independent ordering:
   sample). All tests are at the sample level with batch as a covariate, and they are exploratory.
 - **Ambient RNA:** it cannot be removed from these counts, because no empty droplets are available. Ambient,
   cross-cell-type and technical genes are flagged instead.
+- **QC bias:** the per-sample mitochondrial cut is set by the glia-dominated distribution, so it removes many
+  neurons. The ribosomal filter removes more microglia after cisplatin (9.4 % vs 3.5 %). Notebook 01 reports QC
+  removal per cell type and condition, using the authors' labels for the removed cells.
 - **Dissection:** it varies between samples. For example, choroid plexus is 40 % of the cells in D21-2750, and two
   cisplatin samples have very few neurons. This affects composition results.
 - **Velocity data:** the RNA velocity layers come from the authors' own quantification, not from re-processing the
