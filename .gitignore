@@ -1,0 +1,58 @@
+# ---- Claude Code notes ------------------------------------
+CLAUDE*
+.claude/
+
+# ---- Single-cell data and objects (large, never version) --
+*.h5ad
+*.h5ad.gz
+*.h5
+*.loom
+*.mtx
+*.mtx.gz
+*.zarr/
+*.rds
+*.RData
+*.rda
+*.pkl
+*.pt
+*.ckpt
+
+# ---- Raw reads / references -------------------------------
+*.fastq
+*.fastq.gz
+*.fq.gz
+*.bam
+*.bai
+*.fa
+*.fa.gz
+*.gtf
+*.gtf.gz
+
+# ---- Generated outputs (figures/ stays tracked) -----------
+results/
+logs/
+cache/
+scvi_models/
+celltypist_models/
+
+# ---- Snakemake state and conda envs (regenerated) --------
+.snakemake/
+
+# ---- Python -----------------------------------------------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+
+# ---- R session files --------------------------------------
+.RData
+.Rhistory
+.Rproj.user/
+
+# ---- OS and editor files ----------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/

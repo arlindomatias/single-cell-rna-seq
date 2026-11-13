@@ -1,0 +1,21 @@
+# Analysis environment used by every Snakemake rule of single_cell_cisp
+# (QC, Harmony integration, clustering, CellTypist annotation, pseudobulk DE, enrichment).
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - scanpy
+  - anndata
+  - harmonypy        # batch integration (sc.external.pp.harmony_integrate)
+  - python-igraph
+  - leidenalg
+  - celltypist
+  - pydeseq2         # pseudobulk DE per cell type
+  - decoupler-py     # pseudobulk aggregation
+  - gseapy           # enrichment (prerank, Enrichr)
+  - pandas
+  - numpy
+  - scipy
+  - matplotlib
+  - seaborn

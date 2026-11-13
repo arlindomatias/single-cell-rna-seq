@@ -1,0 +1,26 @@
+# Driver + interactive environment for the whole repository.
+# Run Snakemake from here (`snakemake --use-conda`); rules build their own envs from
+# <project>/envs/*.yaml. The analysis stack is included for interactive/notebook work.
+name: single-cell
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - snakemake
+  - mamba  # default conda frontend for `snakemake --use-conda`
+  - scanpy
+  - anndata
+  - harmonypy
+  - python-igraph
+  - leidenalg
+  - celltypist
+  - pydeseq2
+  - decoupler-py
+  - gseapy
+  - pandas
+  - numpy
+  - scipy
+  - matplotlib
+  - seaborn
+  - ipykernel
